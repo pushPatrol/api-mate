@@ -1,0 +1,175 @@
+stages:
+- test
+- build
+- release
+- deploy
+
+variables:
+  DOCKER_IMAGE: $REGISTRY_HOST/$CI_PROJECT_PATH
+  DEPLOY_PATH: /var/opt/gitlab/api-mate
+  GITHUB_REPO: $GITHUB_URL/api-mate
+
+# ---------------------------------------------------------------------------
+# TEST – runs on every branch
+# ---------------------------------------------------------------------------
+
+# Verifies that the build process completes without errors
+test:build:
+  stage: test
+  image: node:22-alpine
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+    - node_modules/
+  script:
+  - npm ci
+  - ./node_modules/.bin/cake build
+  artifacts:
+    paths:
+    - lib/
+    expire_in: 1 hour
+
+# Verifies that lib/servers.json contains valid JSON
+test:validate-config:
+  stage: test
+  image: node:22-alpine
+  script:
+  - node -e " const fs = require('fs'); JSON.parse(fs.readFileSync('lib/servers.json', 'utf8')); console.log('lib/servers.json is valid JSON'); "
+
+# ---------------------------------------------------------------------------
+# BUILD – only on development and master branch
+# ---------------------------------------------------------------------------
+
+.docker-build:
+  stage: build
+  image: docker:26
+  services:
+  - name: docker:26-dind
+    command: [ "--tls=false" ]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+  - test:build
+  - test:validate-config
+  before_script:
+  - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$REGISTRY_HOST"
+  script:
+  - docker build -t "$DOCKER_IMAGE:$DOCKER_TAG" .
+  - docker push "$DOCKER_IMAGE:$DOCKER_TAG"
+
+build:development:
+  extends: .docker-build
+  variables:
+    DOCKER_TAG: development
+  rules:
+  - if: $CI_COMMIT_BRANCH == "development"
+
+build:master:
+  extends: .docker-build
+  variables:
+    DOCKER_TAG: latest
+  rules:
+  - if: $CI_COMMIT_BRANCH == "master"
+
+# Builds Docker image tagged with the version tag (e.g. v1.0.0) + latest
+build:release:
+  extends: .docker-build
+  script:
+  - docker build -t "$DOCKER_IMAGE:$CI_COMMIT_TAG" -t "$DOCKER_IMAGE:latest" .
+  - docker push "$DOCKER_IMAGE:$CI_COMMIT_TAG"
+  - docker push "$DOCKER_IMAGE:latest"
+  rules:
+  - if: $CI_COMMIT_TAG
+
+# ---------------------------------------------------------------------------
+# RELEASE – only on version tags (e.g. v1.0.0)
+#
+# Required CI/CD variables:
+#   GITHUB_TOKEN  – GitHub Personal Access Token (scope: repo)
+# ---------------------------------------------------------------------------
+
+# Creates a GitLab Release with notes extracted from CHANGELOG.md
+release:gitlab:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+  - build:release
+  script:
+  - |
+    VERSION="${CI_COMMIT_TAG#v}"
+    awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md \
+      | sed '/^[[:space:]]*$/d' > release_notes.md
+    [ -s release_notes.md ] || echo "Release $CI_COMMIT_TAG" > release_notes.md
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: './release_notes.md'
+  rules:
+  - if: $CI_COMMIT_TAG
+
+# Mirrors master + tag to GitHub and creates a GitHub Release
+release:github:
+  stage: release
+  image: alpine:latest
+  needs:
+  - release:gitlab
+  before_script:
+  - apk add --no-cache git curl jq
+  script:
+  - |
+    VERSION="${CI_COMMIT_TAG#v}"
+    NOTES=$(awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md \
+      | sed '/^[[:space:]]*$/d')
+    [ -n "$NOTES" ] || NOTES="Release $CI_COMMIT_TAG"
+
+    git remote add github "https://x-access-token:${GITHUB_TOKEN}@github.com/pushPatrol/api-mate.git"
+    git push github HEAD:master
+    git push github "$CI_COMMIT_TAG"
+
+    PAYLOAD=$(jq -n \
+      --arg tag  "$CI_COMMIT_TAG" \
+      --arg name "Release $CI_COMMIT_TAG" \
+      --arg body "$NOTES" \
+      '{"tag_name":$tag,"name":$name,"body":$body,"draft":false,"prerelease":false}')
+    curl -sf -X POST \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github.v3+json" \
+      "https://api.github.com/repos/pushPatrol/api-mate/releases" \
+      -d "$PAYLOAD"
+  rules:
+  - if: $CI_COMMIT_TAG
+#
+# Required CI/CD variables (Settings → CI/CD → Variables):
+#   SSH_PRIVATE_KEY   – private SSH key for the test server
+#   SSH_KNOWN_HOSTS   – known_hosts entry for the test server
+#   DEPLOY_HOST       – hostname/IP of the test server
+#   DEPLOY_USER       – SSH user on the test server
+#   DEPLOY_PATH       – path to docker-compose.yml on the test server
+#   GITHUB_TOKEN      – GitHub Personal Access Token (scope: repo)
+# ---------------------------------------------------------------------------
+
+deploy:development:
+  stage: deploy
+  image: alpine:latest
+  needs:
+  - build:development
+  before_script:
+  - apk add --no-cache openssh-client
+  - eval $(ssh-agent -s)
+  - chmod 600 "$SSH_PRIVATE_KEY" && ssh-add "$SSH_PRIVATE_KEY"
+  - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  - printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+  script:
+  - |
+    ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+      docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $REGISTRY_HOST &&
+      docker pull $DOCKER_IMAGE:development &&
+      cd $DEPLOY_PATH && docker-compose down &&
+      docker-compose up -d --no-build
+    "
+  environment:
+    name: development
+    url: http://$DEPLOY_HOST
+  rules:
+  - if: $CI_COMMIT_BRANCH == "development"
