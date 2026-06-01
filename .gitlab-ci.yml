@@ -127,8 +127,7 @@ build:release:
   - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$REGISTRY_HOST"
   script:
   - docker pull "$DOCKER_IMAGE:$DOCKER_TAG"
-  - grype "$DOCKER_IMAGE:$DOCKER_TAG"
-  - grype "$DOCKER_IMAGE:$DOCKER_TAG" --only-fixed -o json > grype-report.json
+  - grype "$DOCKER_IMAGE:$DOCKER_TAG" -o table -o "json=grype-report.json"
   - |
     HIGH_EPSS=$(jq '[.matches[] | select(
       (.vulnerability.severity == "High" or .vulnerability.severity == "Critical") and
@@ -188,8 +187,7 @@ scan:scheduled:
   script:
   - npm audit --audit-level=high 2>&1 | tee npm-audit-report.txt
   - docker pull "$DOCKER_IMAGE:latest"
-  - grype "$DOCKER_IMAGE:latest"
-  - grype "$DOCKER_IMAGE:latest" --only-fixed -o json > grype-report.json
+  - grype "$DOCKER_IMAGE:latest" -o table -o "json=grype-report.json"
   - |
     HIGH_EPSS=$(jq '[.matches[] | select(
       (.vulnerability.severity == "High" or .vulnerability.severity == "Critical") and
