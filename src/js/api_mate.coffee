@@ -47,12 +47,44 @@ window.ApiMate = class ApiMate
     @urlsLast = null
 
   start: ->
+    # load server list from config, then initialize
+    @loadServers =>
+      @_startAfterServers()
+
+  loadServers: (callback) ->
+    $.getJSON('servers.json')
+      .done (servers) =>
+        $select = $("[data-api-mate-server='url']")
+        $select.empty()
+        for server in servers
+          $option = $('<option>')
+            .val(server.url)
+            .text(server.name)
+            .attr('data-secret', server.secret or '')
+          $select.append($option)
+        @_updateSecretFromSelected()
+        callback?()
+      .fail =>
+        console.warn 'Could not load servers.json – server dropdown will be empty.'
+        callback?()
+
+  _updateSecretFromSelected: ->
+    $select = $("[data-api-mate-server='url']")
+    secret = $select.find('option:selected').attr('data-secret')
+    if secret?
+      $("[data-api-mate-server='salt']").val(secret)
+
+  _startAfterServers: ->
     # set random values in some inputs
     @initializeMenu()
 
     # when the meeting name is changed, change the id also
     $("[data-api-mate-param*='meetingID']").on "keyup", ->
       $("[data-api-mate-param*='name']").val $(this).val()
+
+    # when server dropdown changes, update the shared secret automatically
+    $("[data-api-mate-server='url']").on "change", =>
+      @_updateSecretFromSelected()
 
     # triggers to generate the links
     $("[data-api-mate-param]").on "change keyup", (e) =>
