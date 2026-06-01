@@ -1,0 +1,5 @@
+[allowlist]
+  description = "lib/servers.json contains the publicly known BBB demo server secret"
+  paths = [
+    '''^lib/servers\.json$''',
+  ]

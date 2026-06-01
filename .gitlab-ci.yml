@@ -32,6 +32,17 @@ test:build:
   rules:
   - if: $CI_PIPELINE_SOURCE != "schedule"
 
+# Scans for accidentally committed secrets, API keys, and tokens
+test:secrets:
+  stage: test
+  image:
+    name: zricethezav/gitleaks:latest
+    entrypoint: [""]
+  script:
+  - gitleaks detect --source . --verbose --redact --config .gitleaks.toml
+  rules:
+  - if: $CI_PIPELINE_SOURCE != "schedule"
+
 # Verifies that lib/servers.json contains valid JSON
 test:validate-config:
   stage: test
