@@ -12,6 +12,7 @@ RUN ./node_modules/.bin/cake build
 
 # Stage 2: Serve
 FROM nginx:alpine
+RUN apk upgrade --no-cache
 COPY --from=builder /app/lib /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
