@@ -1,0 +1,6 @@
+.git/
+node_modules/
+*.log
+.sass-cache/
+proxy/
+events/

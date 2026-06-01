@@ -1,0 +1,8 @@
+services:
+  api-mate:
+    image: registry.gitlab.n4n.at/bitcon-intern/api-mate:development
+    restart: unless-stopped
+    ports:
+      - "9000:80"
+    volumes:
+      - ./servers.json:/usr/share/nginx/html/servers.json:ro
