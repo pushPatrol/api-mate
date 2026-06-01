@@ -98,4 +98,4 @@ The GitLab CI/CD pipeline (`.gitlab-ci.yml`) runs the following stages:
 ## License
 
 Distributed under the [MIT License](LICENSE).
-Copyright (c) 2013 Mconf, 2026 Bitcon.
+Copyright (c) 2013 Mconf, 2026 pushPatrol.
