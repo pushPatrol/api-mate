@@ -237,12 +237,14 @@ release:gitlab:
   rules:
   - if: $CI_COMMIT_TAG
 
-# Mirrors master + tag to GitHub and creates a GitHub Release
+# Mirrors master + tag to GitHub, creates a GitHub Release and uploads the SBOM as asset
 release:github:
   stage: release
   image: alpine:latest
   needs:
   - release:gitlab
+  - job: build:release
+    artifacts: true
   before_script:
   - apk add --no-cache git curl jq
   script:
@@ -261,11 +263,19 @@ release:github:
       --arg name "Release $CI_COMMIT_TAG" \
       --arg body "$NOTES" \
       '{"tag_name":$tag,"name":$name,"body":$body,"draft":false,"prerelease":false}')
-    curl -sf -X POST \
+    RELEASE=$(curl -sf -X POST \
       -H "Authorization: token $GITHUB_TOKEN" \
       -H "Accept: application/vnd.github.v3+json" \
       "https://api.github.com/repos/pushPatrol/api-mate/releases" \
-      -d "$PAYLOAD"
+      -d "$PAYLOAD")
+
+    UPLOAD_URL=$(echo "$RELEASE" | jq -r '.upload_url' | sed 's/{?name,label}//')
+    curl -sf -X POST \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github.v3+json" \
+      -H "Content-Type: application/json" \
+      "${UPLOAD_URL}?name=sbom.spdx.json&label=SBOM%20(SPDX-JSON)" \
+      --data-binary @sbom.spdx.json
   rules:
   - if: $CI_COMMIT_TAG
 #
