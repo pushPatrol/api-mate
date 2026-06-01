@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-06-01
+
+### Fixed
+- SBOM (SPDX-JSON) is now correctly uploaded as a release asset to GitHub
+
 ## [1.0.1] - 2026-06-01
 
 ### Added
