@@ -149,7 +149,7 @@ scan:container:development:
   variables:
     DOCKER_TAG: development
   rules:
-  - if: $CI_COMMIT_BRANCH == "development"
+  - if: $CI_COMMIT_BRANCH == "development" && $CI_PIPELINE_SOURCE != "schedule"
 
 scan:container:master:
   extends: .grype-scan
@@ -158,7 +158,7 @@ scan:container:master:
   variables:
     DOCKER_TAG: latest
   rules:
-  - if: $CI_COMMIT_BRANCH == "master"
+  - if: $CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE != "schedule"
 
 scan:container:release:
   extends: .grype-scan
