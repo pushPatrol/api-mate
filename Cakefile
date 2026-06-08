@@ -1,6 +1,6 @@
 chokidar = require('chokidar')
 fs = require('fs')
-{spawn} = require('child_process')
+{spawn, exec} = require('child_process')
 pug = require('pug')
 sass = require('sass')
 
@@ -37,19 +37,19 @@ compileCss = (done) ->
     run 'sass', options, ->
       done?()
 
+runShell = (cmd, label, onExit) ->
+  console.log timeNow() + ' - running: ' + label
+  exec cmd, (error, stdout, stderr) ->
+    console.log stderr if stderr
+    console.log timeNow() + ' - done.'
+    onExit?(error)
+
 compileJs = (done) ->
-  options = [
-    '-o', 'lib',
-    '--join', 'api_mate.js',
-    '--compile', 'src/js/application.coffee', 'src/js/templates.coffee', 'src/js/api_mate.coffee'
-  ]
-  run 'coffee', options, ->
-    options = [
-      '-o', 'lib',
-      '--join', 'redis_events.js',
-      '--compile', 'src/js/application.coffee', 'src/js/redis_events.coffee'
-    ]
-    run 'coffee', options, ->
+  coffee = binPath + 'coffee'
+  cmd = "cat src/js/application.coffee src/js/templates.coffee src/js/api_mate.coffee | #{coffee} --compile --stdio > lib/api_mate.js"
+  runShell cmd, 'coffee (api_mate.js)', ->
+    cmd = "cat src/js/application.coffee src/js/redis_events.coffee | #{coffee} --compile --stdio > lib/redis_events.js"
+    runShell cmd, 'coffee (redis_events.js)', ->
       done?()
 
 build = (done) ->
