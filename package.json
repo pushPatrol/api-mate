@@ -7,7 +7,7 @@
   },
   "devDependencies": {
     "chokidar": "^5.0.0",
-    "coffee-script": "^1.12.7",
+    "coffeescript": "^2.7.0",
     "pug": "^3.0.4",
     "sass": "^1.77.0"
   },
