@@ -6,7 +6,7 @@
     "uglify-js": "^3.19.3"
   },
   "devDependencies": {
-    "chokidar": "3.5.3",
+    "chokidar": "^5.0.0",
     "coffee-script": "^1.12.7",
     "pug": "^3.0.4",
     "sass": "^1.77.0"
