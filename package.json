@@ -3,13 +3,13 @@
   "version": "0.0.1",
   "dependencies": {
     "pug-cli": "^1.0.0-alpha6",
-    "uglify-js": "^3.17.4"
+    "uglify-js": "^3.19.3"
   },
   "devDependencies": {
-    "pug": "3.0.2",
-    "sass": "^1.77.0",
-    "coffee-script": "1.6.3",
-    "chokidar": "3.5.3"
+    "chokidar": "^5.0.0",
+    "coffee-script": "^1.12.7",
+    "pug": "^3.0.4",
+    "sass": "^1.77.0"
   },
   "engine": "node >= 12.4.0"
 }
